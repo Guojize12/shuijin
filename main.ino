@@ -31,6 +31,10 @@ unsigned long lastDebounceTime = 0;
 const unsigned long debounceDelay = 50; // ms
 bool captureBusy = false;
 
+// ========= 软件总看门狗 =========
+static unsigned long last_mainloop_heartbeat = 0;
+static const unsigned long MAINLOOP_WATCHDOG_TIMEOUT = 120000; // 2分钟
+
 void setup() {
   Serial.begin(DTU_BAUD);
 #if ENABLE_LOG2
@@ -98,10 +102,16 @@ void setup() {
   gotoStep(STEP_IDLE);
 
   pinMode(BUTTON_PIN, INPUT_PULLUP);
+
+  // ====== 看门狗心跳初始化 ======
+  last_mainloop_heartbeat = millis();
 }
 
 void loop()
 {
+  // ---- 看门狗心跳刷新 ----
+  last_mainloop_heartbeat = millis();
+
   readDTU();
   driveStateMachine();
 
@@ -134,5 +144,18 @@ void loop()
 #if ENABLE_LOG2
     Serial2.println("[RTC] Not valid yet.");
 #endif
+  }
+
+  // ==== 总看门狗：检测主循环卡死或严重异常自动重启 ====
+  static unsigned long last_check = 0;
+  unsigned long now = millis();
+  if (now - last_check > 5000) { // 每5秒检测一次
+    last_check = now;
+    // 检查心跳是否超时
+    if (now - last_mainloop_heartbeat > MAINLOOP_WATCHDOG_TIMEOUT) {
+      Serial.println("[WDT] Mainloop blocked or system hang, rebooting...");
+      delay(200);
+      ESP.restart();
+    }
   }
 }
