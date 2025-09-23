@@ -11,5 +11,3 @@ bool comm_isConnected();
 
 // 声明对外 scheduleStatePoll
 void scheduleStatePoll();
-//增加时间读取
-void queryCCLK();

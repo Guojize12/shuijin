@@ -10,8 +10,7 @@ typedef enum {
     STEP_ENCODING,
     STEP_MIPCLOSE,
     STEP_MIPOPEN,
-    STEP_MONITOR,
-    STEP_CCLK
+    STEP_MONITOR
 } Step;
 
 // 原有对外接口（保持不变，兼容 main.ino）
