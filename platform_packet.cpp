@@ -9,7 +9,7 @@ static const uint16_t PLATFORM_HEADER_LEN = 21;
 
 // 每次 MIPSEND 发送的二进制字节数上限（将被转成 2x HEX 字符）
 // 取 512 字节更容易满足多数模组单行长度限制
-static const size_t MIPSEND_BIN_CHUNK = 512;
+static const size_t MIPSEND_BIN_CHUNK = 128;
 
 // 保留原构建函数（小包可用）；大包发送走流式发送
 size_t build_platform_packet(uint8_t* out,

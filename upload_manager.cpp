@@ -182,4 +182,30 @@ void upload_drive() {
     uploadSimInfoIfNeeded();           // SIM卡状态上报
     uploadRealtimeDataIfNeeded(now);
     uploadMonitorEventIfNeeded();
+
+    // ====== 新增测试代码：依次上传不同长度的假图片 ======
+    static int test_idx = 0;
+    static const size_t test_sizes[] = {10, 100, 500, 1000, 1500, 2000};
+    static uint32_t last_test_ms = 0;
+
+    if (!comm_isConnected() || !rtc_is_valid()) return;
+
+    if (test_idx < (int)(sizeof(test_sizes)/sizeof(test_sizes[0])) && (now - last_test_ms > 8000)) { // 每8秒发一组
+        size_t sz = test_sizes[test_idx];
+        uint8_t *fakeImg = (uint8_t*)malloc(sz);
+        if (fakeImg) {
+            memset(fakeImg, 0xAA, sz); // 填充假数据
+            PlatformTime t;
+            rtc_now_fields(&t);
+            sendMonitorEventUpload(
+                t.year, t.month, t.day, t.hour, t.minute, t.second,
+                1, 0.0f, 0.0f, fakeImg, sz
+            );
+            free(fakeImg);
+            Serial.print("[TEST] Sent fake image, size=");
+            Serial.println(sz);
+        }
+        test_idx++;
+        last_test_ms = now;
+    }
 }
