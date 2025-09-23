@@ -7,6 +7,22 @@ static uint32_t camera_next_reinit_allowed = 0;
 static const uint32_t CAMERA_BACKOFF_BASE = 3000;
 static const uint32_t CAMERA_BACKOFF_MAX = 30000;
 
+// 新增：摄像头参数优化
+static void tune_camera_sensor() {
+    sensor_t * s = esp_camera_sensor_get();
+    if (!s) return;
+    s->set_brightness(s, 1);       // 亮度：[-2,2]
+    s->set_contrast(s, 2);         // 对比度：[-2,2]
+    s->set_saturation(s, 1);       // 饱和度：[-2,2]
+    s->set_whitebal(s, 1);         // 自动白平衡 ON
+    s->set_awb_gain(s, 1);         // 白平衡增益 ON
+    s->set_gainceiling(s, (gainceiling_t)3); // 增益上限
+    // 如需指定白平衡模式可启用以下行
+    // s->set_wb_mode(s, 0); // 0=自动, 1=晴天, 2=阴天, 3=办公室, 4=家里
+    // s->set_hmirror(s, 0); // 水平翻转
+    // s->set_vflip(s, 0);   // 垂直翻转
+}
+
 camera_config_t make_config(framesize_t size, int xclk, int q) {
     camera_config_t c;
     c.ledc_channel = LEDC_CHANNEL_0;
@@ -30,8 +46,12 @@ camera_config_t make_config(framesize_t size, int xclk, int q) {
 bool try_camera_init_once(framesize_t size, int xclk, int q) {
     camera_config_t cfg = make_config(size, xclk, q);
     esp_err_t err = esp_camera_init(&cfg);
+    if (err == ESP_OK) {
+        tune_camera_sensor(); // 优化传感器参数
+        return true;
+    }
     // 日志已移除
-    return err == ESP_OK;
+    return false;
 }
 
 bool init_camera_multi() {
@@ -40,6 +60,8 @@ bool init_camera_multi() {
     for (int i = 0; i < INIT_RETRY_PER_CONFIG; i++) {
         if (try_camera_init_once(FRAME_SIZE_PREF, 20000000, JPEG_QUALITY_PREF)) {
             camera_ok = true;
+            // 拍照前丢弃几帧以收敛自动曝光/白平衡
+            discard_frames(DISCARD_FRAMES_ON_START);
             return true;
         }
         delay(120);
@@ -48,6 +70,7 @@ bool init_camera_multi() {
     for (int i = 0; i < INIT_RETRY_PER_CONFIG; i++) {
         if (try_camera_init_once(FRAME_SIZE_FALLBACK, 10000000, JPEG_QUALITY_FALLBACK)) {
             camera_ok = true;
+            discard_frames(DISCARD_FRAMES_ON_START);
             return true;
         }
         delay(150);
@@ -72,12 +95,14 @@ bool reinit_camera_with_params(framesize_t size, int quality) {
     deinit_camera_silent();
     camera_config_t cfg = make_config(size, 20000000, quality);
     if (esp_camera_init(&cfg) == ESP_OK) {
+        tune_camera_sensor();
         camera_ok = true;
         return true;
     }
     deinit_camera_silent();
     cfg = make_config(size, 10000000, quality + 2);
     if (esp_camera_init(&cfg) == ESP_OK) {
+        tune_camera_sensor();
         camera_ok = true;
         return true;
     }

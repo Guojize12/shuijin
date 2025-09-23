@@ -99,8 +99,8 @@ extern volatile int g_monitorEventUploadFlag;
 #define DEFAULT_FLASH_DUTY             80
 #define FRAME_SIZE_PREF                FRAMESIZE_SVGA
 #define FRAME_SIZE_FALLBACK            FRAMESIZE_VGA
-#define JPEG_QUALITY_PREF              15
-#define JPEG_QUALITY_FALLBACK          20
+#define JPEG_QUALITY_PREF              8
+#define JPEG_QUALITY_FALLBACK          12
 #define INIT_RETRY_PER_CONFIG          3
 #define RUNTIME_FAIL_REINIT_THRESHOLD  3
 #define CAPTURE_FAIL_REBOOT_THRESHOLD  10
@@ -108,7 +108,7 @@ extern volatile int g_monitorEventUploadFlag;
 #define HEAP_MIN_REBOOT                10000
 #define SD_MIN_FREE_MB                 5
 #define DISCARD_FRAMES_ON_START        3
-#define DISCARD_FRAMES_EACH_SHOT       0
+#define DISCARD_FRAMES_EACH_SHOT       3
 #define ENABLE_AUTO_REINIT             1
 #define ENABLE_STATS_LOG               1
 #define ENABLE_FRAME_HEADER            0

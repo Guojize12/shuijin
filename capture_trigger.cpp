@@ -3,6 +3,7 @@
 #include "camera_module.h"
 #include "sdcard_module.h"
 #include "rtc_soft.h"
+#include "config.h"
 #include <string.h>
 
 // 来自 main.ino 的事件上传标志
@@ -11,10 +12,18 @@ extern volatile int g_monitorEventUploadFlag;
 // 全局保存最后一张照片的文件名（上传用）
 char g_lastPhotoName[64] = {0};
 
+// 优化：拍照前丢弃若干帧，收敛自动曝光/白平衡
+static void discard_frames_before_capture() {
+    // 拍照前丢弃若干帧，帧数由配置控制
+    if (DISCARD_FRAMES_EACH_SHOT > 0)
+        discard_frames(DISCARD_FRAMES_EACH_SHOT);
+}
+
 uint8_t capture_once_internal(uint8_t trigger) {
     if (!camera_ok) return CR_CAMERA_NOT_READY;
     flashOn();
     delay(60);
+    discard_frames_before_capture();
     camera_fb_t *fb = esp_camera_fb_get();
     if (!fb) { flashOff(); return CR_FRAME_GRAB_FAIL; }
     bool sdOk = save_frame_to_sd(fb, 0); // 仅保存，不返回文件名
@@ -29,6 +38,7 @@ bool capture_and_process(uint8_t trigger, bool upload) {
 
     flashOn();
     delay(60);
+    discard_frames_before_capture();
     camera_fb_t *fb = esp_camera_fb_get();
     if (!fb) { flashOff(); return false; }
 
