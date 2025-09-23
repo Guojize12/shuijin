@@ -31,9 +31,9 @@ unsigned long lastDebounceTime = 0;
 const unsigned long debounceDelay = 50; // ms
 bool captureBusy = false;
 
-// ========= 软件总看门狗 =========
-static unsigned long last_mainloop_heartbeat = 0;
-static const unsigned long MAINLOOP_WATCHDOG_TIMEOUT = 120000; // 2分钟
+// 新增：长按判定变量
+static bool waitingForLongPress = false;
+static unsigned long buttonPressStartMs = 0;
 
 void setup() {
   Serial.begin(DTU_BAUD);
@@ -102,16 +102,10 @@ void setup() {
   gotoStep(STEP_IDLE);
 
   pinMode(BUTTON_PIN, INPUT_PULLUP);
-
-  // ====== 看门狗心跳初始化 ======
-  last_mainloop_heartbeat = millis();
 }
 
 void loop()
 {
-  // ---- 看门狗心跳刷新 ----
-  last_mainloop_heartbeat = millis();
-
   readDTU();
   driveStateMachine();
 
@@ -122,18 +116,33 @@ void loop()
   }
   if ((millis() - lastDebounceTime) > debounceDelay) {
     static int lastStableState = HIGH;
-    if (reading == LOW && lastStableState == HIGH && !captureBusy) {
-      captureBusy = true;
+
+    // --------- 长按10秒拍照逻辑 ---------
+    if (reading == LOW) { // 按钮按下
+      if (!waitingForLongPress) {
+        // 第一次检测到按下，记录时间
+        buttonPressStartMs = millis();
+        waitingForLongPress = true;
+      } else if (!captureBusy && (millis() - buttonPressStartMs > 10000)) {
+        // 持续按下超过10秒，执行拍照
+        captureBusy = true;
 #if ENABLE_LOG2
-      Serial2.println("[BTN] Button pressed, start capture!");
+        Serial2.println("[BTN] Button long pressed (>10s), start capture!");
 #endif
-      bool ok = capture_and_process(TRIGGER_BUTTON, true);
+        bool ok = capture_and_process(TRIGGER_BUTTON, true);
 #if ENABLE_LOG2
-      if (ok) Serial2.println("[BTN] Capture saved; event flagged for upload.");
-      else Serial2.println("[BTN] Capture failed!");
+        if (ok) Serial2.println("[BTN] Capture saved; event flagged for upload.");
+        else Serial2.println("[BTN] Capture failed!");
 #endif
-      captureBusy = false;
+        captureBusy = false;
+        waitingForLongPress = false; // 防止重复触发
+      }
+    } else { // 按钮松开
+      waitingForLongPress = false;
+      buttonPressStartMs = 0;
     }
+    // --------- END 长按10秒拍照逻辑 ---------
+
     lastStableState = reading;
   }
   lastButtonState = reading;
@@ -144,18 +153,5 @@ void loop()
 #if ENABLE_LOG2
     Serial2.println("[RTC] Not valid yet.");
 #endif
-  }
-
-  // ==== 总看门狗：检测主循环卡死或严重异常自动重启 ====
-  static unsigned long last_check = 0;
-  unsigned long now = millis();
-  if (now - last_check > 5000) { // 每5秒检测一次
-    last_check = now;
-    // 检查心跳是否超时
-    if (now - last_mainloop_heartbeat > MAINLOOP_WATCHDOG_TIMEOUT) {
-      Serial.println("[WDT] Mainloop blocked or system hang, rebooting...");
-      delay(200);
-      ESP.restart();
-    }
   }
 }
